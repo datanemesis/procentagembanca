@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Calculadora de Banca com Histórico e Data</title>
+    <title>Calculadora de Banca Profissional</title>
     <style>
         * {
             box-sizing: border-box;
@@ -27,7 +27,7 @@
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
             padding: 30px;
             width: 100%;
-            max-width: 520px;
+            max-width: 550px;
             margin-bottom: 25px;
         }
 
@@ -166,7 +166,11 @@
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
             padding: 20px;
             width: 100%;
-            max-width: 520px;
+            max-width: 550px;
+        }
+
+        .table-responsive {
+            width: 100%;
             overflow-x: auto;
         }
 
@@ -174,24 +178,38 @@
             width: 100%;
             border-collapse: collapse;
             text-align: left;
-            font-size: 0.85rem;
+            font-size: 0.8rem;
         }
 
         th, td {
-            padding: 10px 8px;
+            padding: 10px 6px;
             border-bottom: 1px solid #eee;
         }
 
         th {
             background-color: #f8f9fa;
             color: #666;
+            font-weight: 600;
         }
 
         .txt-data {
             color: #777;
-            font-size: 0.8rem;
             white-space: nowrap;
         }
+
+        .badge-pct {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 600;
+            font-size: 0.75rem;
+        }
+
+        /* Cores das porcentagens na tabela baseadas nas suas regras */
+        .pct-a-verde { background-color: #d4edda; color: #155724; }
+        .pct-a-vermelho { background-color: #f8d7da; color: #721c24; }
+        .pct-b-verde { background-color: #d4edda; color: #155724; }
+        .pct-b-vermelho { background-color: #f8d7da; color: #721c24; }
 
         .subiu { color: #28a745; font-weight: bold; }
         .desceu { color: #dc3545; font-weight: bold; }
@@ -242,18 +260,22 @@
 <!-- Container do Histórico -->
 <div class="historico-container">
     <h3>Histórico de Evolução (Últimos 20)</h3>
-    <table id="tabelaHistorico">
-        <thead>
-            <tr>
-                <th>Data / Hora</th>
-                <th>Soma Total</th>
-                <th>Evolução</th>
-            </tr>
-        </thead>
-        <tbody id="corpoHistorico">
-            <!-- Linhas inseridas via JS -->
-        </tbody>
-    </table>
+    <div class="table-responsive">
+        <table id="tabelaHistorico">
+            <thead>
+                <tr>
+                    <th>Data / Hora</th>
+                    <th>Casa A (%)</th>
+                    <th>Casa B (%)</th>
+                    <th>Soma Total</th>
+                    <th>Evolução</th>
+                </tr>
+            </thead>
+            <tbody id="corpoHistorico">
+                <!-- Linhas inseridas via JS -->
+            </tbody>
+        </table>
+    </div>
     <button class="btn btn-limpar" id="btnLimpar" style="margin-top: 15px;">Limpar Histórico</button>
 </div>
 
@@ -271,8 +293,10 @@
     const corpoHistorico = document.getElementById('corpoHistorico');
 
     let ultimaSomaCalculada = 0;
+    let ultimaPctA = 0;
+    let ultimaPctB = 0;
 
-    // Carrega o histórico ao iniciar a página
+    // Inicializa a tabela puxando dados salvos
     atualizarTabelaInterface();
 
     function formatarMoeda(input) {
@@ -298,18 +322,22 @@
         txtSoma.innerText = total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
         if (total > 0) {
-            let pctA = (valA / total) * 100;
-            let pctB = (valB / total) * 100;
+            ultimaPctA = (valA / total) * 100;
+            ultimaPctB = (valB / total) * 100;
 
-            txtPctA.innerText = pctA.toFixed(2) + '%';
-            txtPctB.innerText = pctB.toFixed(2) + '%';
+            txtPctA.innerText = ultimaPctA.toFixed(2) + '%';
+            txtPctB.innerText = ultimaPctB.toFixed(2) + '%';
 
-            if (pctA > 70) cardA.className = "status-card bg-verde";
+            // Validação Casa A (>70% Verde)
+            if (ultimaPctA > 70) cardA.className = "status-card bg-verde";
             else cardA.className = "status-card bg-vermelho";
 
-            if (pctB > 30) cardB.className = "status-card bg-vermelho";
+            // Validação Casa B (>30% Vermelho)
+            if (ultimaPctB > 30) cardB.className = "status-card bg-vermelho";
             else cardB.className = "status-card bg-verde";
         } else {
+            ultimaPctA = 0;
+            ultimaPctB = 0;
             txtPctA.innerText = '0%';
             txtPctB.innerText = '0%';
             cardA.className = "status-card";
@@ -317,44 +345,42 @@
         }
     }
 
-    // --- LÓGICA DO LOCAL STORAGE, DATA E HISTÓRICO ---
+    // --- LÓGICA DO LOCAL STORAGE ---
 
     function pegarHistorico() {
-        return JSON.parse(localStorage.getItem('historicoBancasCompleto')) || [];
+        return JSON.parse(localStorage.getItem('historicoBancasPro')) || [];
     }
 
     function obterDataHoraAtual() {
         const agora = new Date();
         const dia = String(agora.getDate()).padStart(2, '0');
-        const mes = String(agora.getMonth() + 1).padStart(2, '0'); // Meses começam em 0
+        const mes = String(agora.getMonth() + 1).padStart(2, '0');
         const ano = agora.getFullYear();
         const hora = String(agora.getHours()).padStart(2, '0');
         const minuto = String(agora.getMinutes()).padStart(2, '0');
-
         return `${dia}/${mes}/${ano} - ${hora}:${minuto}`;
     }
 
-    function salvarNoHistorico(novaSoma) {
+    function salvarNoHistorico(novaSoma, pctA, pctB) {
         if (novaSoma <= 0) return; 
 
         let historico = pegarHistorico();
         let dataFormatada = obterDataHoraAtual();
 
-        // Cria o objeto contendo o valor e o momento exato do registro
         let novoRegistro = {
             valor: novaSoma,
+            porcentagemA: pctA,
+            porcentagemB: pctB,
             data: dataFormatada
         };
 
-        // Adiciona no topo da lista
         historico.unshift(novoRegistro);
 
-        // Garante o limite das últimas 20 linhas
         if (historico.length > 20) {
             historico = historico.slice(0, 20);
         }
 
-        localStorage.setItem('historicoBancasCompleto', JSON.stringify(historico));
+        localStorage.setItem('historicoBancasPro', JSON.stringify(historico));
         atualizarTabelaInterface();
     }
 
@@ -363,7 +389,7 @@
         corpoHistorico.innerHTML = "";
 
         if (historico.length === 0) {
-            corpoHistorico.innerHTML = `<tr><td colspan="3" style="text-align:center; color:#999;">Nenhum registro salvo.</td></tr>`;
+            corpoHistorico.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#999;">Nenhum registro salvo.</td></tr>`;
             return;
         }
 
@@ -371,12 +397,11 @@
             let textoEvolucao = "-";
             let classeEvolucao = "neutro";
 
-            // Compara com o item cronologicamente anterior (índice seguinte devido ao unshift)
+            // Compara evolução com o item cronologicamente anterior
             if (index < historico.length - 1) {
                 let itemAnterior = historico[index + 1];
                 let diferenca = itemAtual.valor - itemAnterior.valor;
                 let pctDif = (diferenca / itemAnterior.valor) * 100;
-
                 let difFormatada = diferenca.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
                 if (diferenca > 0) {
@@ -391,11 +416,17 @@
                 }
             }
 
+            // Define as classes de cores para as porcentagens salvas na tabela (seguindo suas regras)
+            let classeBadgeA = itemAtual.porcentagemA > 70 ? "pct-a-verde" : "pct-a-vermelho";
+            let classeBadgeB = itemAtual.porcentagemB > 30 ? "pct-b-vermelho" : "pct-b-verde";
+
             let tr = document.createElement('tr');
             tr.innerHTML = `
                 <td class="txt-data">${itemAtual.data}</td>
+                <td><span class="badge-pct ${classeBadgeA}">${itemAtual.porcentagemA.toFixed(1)}%</span></td>
+                <td><span class="badge-pct ${classeBadgeB}">${itemAtual.porcentagemB.toFixed(1)}%</span></td>
                 <td><strong>${itemAtual.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong></td>
-                <td class="${classeEvolucao}">${textoEvolucao}</td>
+                <td class="${classeEvolucao}" style="font-size: 0.75rem;">${textoEvolucao}</td>
             `;
             corpoHistorico.appendChild(tr);
         });
@@ -407,12 +438,12 @@
     inputB.addEventListener('input', function() { formatarMoeda(this); processarCalculos(); });
 
     btnSalvar.addEventListener('click', function() {
-        salvarNoHistorico(ultimaSomaCalculada);
+        salvarNoHistorico(ultimaSomaCalculada, ultimaPctA, ultimaPctB);
     });
 
     btnLimpar.addEventListener('click', function() {
         if(confirm("Tem certeza que deseja apagar todo o histórico?")) {
-            localStorage.removeItem('historicoBancasCompleto');
+            localStorage.removeItem('historicoBancasPro');
             atualizarTabelaInterface();
         }
     });
