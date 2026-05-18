@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Calculadora de Banca</title>
+    <title>Calculadora de Banca com Histórico</title>
     <style>
         * {
             box-sizing: border-box;
@@ -15,7 +15,7 @@
         body {
             background-color: #f0f2f5;
             display: flex;
-            justify-content: center;
+            flex-direction: column;
             align-items: center;
             min-height: 100vh;
             padding: 20px;
@@ -27,15 +27,18 @@
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
             padding: 30px;
             width: 100%;
-            max-width: 450px;
+            max-width: 500px;
+            margin-bottom: 25px;
         }
 
-        h2 {
+        h2, h3 {
             text-align: center;
             color: #333;
             margin-bottom: 25px;
-            font-size: 1.5rem;
         }
+
+        h2 { font-size: 1.5rem; }
+        h3 { font-size: 1.2rem; margin-bottom: 15px; }
 
         .input-group {
             margin-bottom: 20px;
@@ -111,7 +114,6 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            transition: background-color 0.3s, color 0.3s;
             font-weight: bold;
             background-color: #eee;
             color: #333;
@@ -128,6 +130,66 @@
             color: #721c24 !important;
             border-left: 5px solid #dc3545;
         }
+
+        /* Botões */
+        .btn {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .btn-salvar {
+            background-color: #4a90e2;
+            color: white;
+            margin-bottom: 10px;
+        }
+
+        .btn-salvar:hover { background-color: #357abd; }
+
+        .btn-limpar {
+            background-color: #e0e0e0;
+            color: #555;
+            padding: 8px;
+            font-size: 0.85rem;
+        }
+        .btn-limpar:hover { background-color: #d5d5d5; }
+
+        /* Tabela de Histórico */
+        .historico-container {
+            background-color: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            width: 100%;
+            max-width: 500px;
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            font-size: 0.9rem;
+        }
+
+        th, td {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+        }
+
+        th {
+            background-color: #f8f9fa;
+            color: #666;
+        }
+
+        .subiu { color: #28a745; font-weight: bold; }
+        .desceu { color: #dc3545; font-weight: bold; }
+        .neutro { color: #888; }
     </style>
 </head>
 <body>
@@ -135,7 +197,6 @@
 <div class="container">
     <h2>Calculadora de Divisão de Banca</h2>
     
-    <!-- Inputs mudados para tipo TEXT para suportar a máscara de pontos e vírgulas -->
     <div class="input-group">
         <label for="bancaA">Banca CASA A</label>
         <div class="input-wrapper">
@@ -154,7 +215,6 @@
 
     <div class="divider"></div>
 
-    <!-- Resultados -->
     <div class="result-box">
         <span class="result-title">Soma Total das Bancas:</span>
         <span class="result-value" id="somaTotal">R$ 0,00</span>
@@ -169,41 +229,54 @@
         <span>Porcentagem CASA B:</span>
         <span id="porcentagemB">0%</span>
     </div>
+
+    <button class="btn btn-salvar" id="btnSalvar">Salvar Registro</button>
+</div>
+
+<!-- Container do Histórico -->
+<div class="historico-container">
+    <h3>Histórico de Evolução (Últimos 20)</h3>
+    <table id="tabelaHistorico">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Soma Total</th>
+                <th>Evolução</th>
+            </tr>
+        </thead>
+        <tbody id="corpoHistorico">
+            <!-- Linhas inseridas via JS -->
+        </tbody>
+    </table>
+    <button class="btn btn-limpar" id="btnLimpar" style="margin-top: 15px;">Limpar Histórico</button>
 </div>
 
 <script>
     const inputA = document.getElementById('bancaA');
     const inputB = document.getElementById('bancaB');
-    
     const txtSoma = document.getElementById('somaTotal');
     const txtPctA = document.getElementById('porcentagemA');
     const txtPctB = document.getElementById('porcentagemB');
-    
     const cardA = document.getElementById('cardA');
     const cardB = document.getElementById('cardB');
+    
+    const btnSalvar = document.getElementById('btnSalvar');
+    const btnLimpar = document.getElementById('btnLimpar');
+    const corpoHistorico = document.getElementById('corpoHistorico');
 
-    // Função que formata o input em tempo real como Moeda Brasileira (14.476,00)
+    let ultimaSomaCalculada = 0;
+
+    // Inicia carregando o histórico salvo no navegador
+    atualizarTabelaInterface();
+
     function formatarMoeda(input) {
-        let valor = input.value.replace(/\D/g, ""); // Remove tudo que não for número
-        
-        if (valor === "") {
-            input.value = "";
-            return 0;
-        }
-
-        // Converte para decimal (centavos)
+        let valor = input.value.replace(/\D/g, "");
+        if (valor === "") { input.value = ""; return 0; }
         let valorNum = parseFloat(valor) / 100;
-        
-        // Formata visualmente no padrão PT-BR
-        input.value = valorNum.toLocaleString('pt-BR', {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2
-        });
-
+        input.value = valorNum.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         return valorNum;
     }
 
-    // Função auxiliar para pegar o valor numérico puro de um input já formatado
     function obterValorPuro(input) {
         let valor = input.value.replace(/\D/g, "");
         if (valor === "") return 0;
@@ -213,10 +286,9 @@
     function processarCalculos() {
         let valA = obterValorPuro(inputA);
         let valB = obterValorPuro(inputB);
-
         let total = valA + valB;
 
-        // Atualiza o total formatado
+        ultimaSomaCalculada = total;
         txtSoma.innerText = total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
         if (total > 0) {
@@ -226,20 +298,11 @@
             txtPctA.innerText = pctA.toFixed(2) + '%';
             txtPctB.innerText = pctB.toFixed(2) + '%';
 
-            // Regra Casa A (>70% Verde)
-            if (pctA > 70) {
-                cardA.className = "status-card bg-verde";
-            } else {
-                cardA.className = "status-card bg-vermelho";
-            }
+            if (pctA > 70) cardA.className = "status-card bg-verde";
+            else cardA.className = "status-card bg-vermelho";
 
-            // Regra Casa B (>30% Vermelho)
-            if (pctB > 30) {
-                cardB.className = "status-card bg-vermelho";
-            } else {
-                cardB.className = "status-card bg-verde";
-            }
-
+            if (pctB > 30) cardB.className = "status-card bg-vermelho";
+            else cardB.className = "status-card bg-verde";
         } else {
             txtPctA.innerText = '0%';
             txtPctB.innerText = '0%';
@@ -248,15 +311,88 @@
         }
     }
 
-    // Eventos disparados ao digitar em cada input
-    inputA.addEventListener('input', function() {
-        formatarMoeda(this);
-        processarCalculos();
+    // --- LÓGICA DO LOCAL STORAGE E HISTÓRICO ---
+
+    function pegarHistorico() {
+        return JSON.parse(localStorage.getItem('historicoBancas')) || [];
+    }
+
+    function salvarNoHistorico(novaSoma) {
+        if (novaSoma <= 0) return; // Evita salvar valor zerado
+
+        let historico = pegarHistorico();
+
+        // Insere o novo registro no início da lista
+        historico.unshift(novaSoma);
+
+        // Limita o array para manter apenas as últimas 20 entradas
+        if (historico.length > 20) {
+            historico = histor River = historico.slice(0, 20);
+        }
+
+        localStorage.setItem('historicoBancas', JSON.stringify(historico));
+        atualizarTabelaInterface();
+    }
+
+    function atualizarTabelaInterface() {
+        let historico = pegarHistorico();
+        corpoHistorico.innerHTML = "";
+
+        if (historico.length === 0) {
+            corpoHistorico.innerHTML = `<tr><td colspan="3" style="text-align:center; color:#999;">Nenhum registro salvo.</td></tr>`;
+            return;
+        }
+
+        // Renderiza da linha mais nova para a mais antiga
+        historico.forEach((valorAtual, index) => {
+            let textoEvolucao = "-";
+            let classeEvolucao = "neutro";
+
+            // O item mais antigo no array (último da lista) não tem anterior para comparar.
+            // Como usamos unshift(), o elemento "anterior" cronologicamente está no índice (index + 1)
+            if (index < historico.length - 1) {
+                let valorAnterior = historico[index + 1];
+                let diferenca = valorAtual - valorAnterior;
+                let pctDif = (diferenca / valorAnterior) * 100;
+
+                let difFormatada = diferenca.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+                if (diferenca > 0) {
+                    textoEvolucao = `+${difFormatada} (+${pctDif.toFixed(1)}%)`;
+                    classeEvolucao = "subiu";
+                } else if (diferenca < 0) {
+                    textoEvolucao = `${difFormatada} (${pctDif.toFixed(1)}%)`;
+                    classeEvolucao = "desceu";
+                } else {
+                    textoEvolucao = "Sem alteração";
+                    classeEvolucao = "neutro";
+                }
+            }
+
+            let tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><strong>${historico.length - index}</strong></td>
+                <td>${valorAtual.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                <td class="${classeEvolucao}">${textoEvolucao}</td>
+            `;
+            corpoHistorico.appendChild(tr);
+        });
+    }
+
+    // --- EVENTOS ---
+
+    inputA.addEventListener('input', function() { formatarMoeda(this); processarCalculos(); });
+    inputB.addEventListener('input', function() { formatarMoeda(this); processarCalculos(); });
+
+    btnSalvar.addEventListener('click', function() {
+        salvarNoHistorico(ultimaSomaCalculada);
     });
 
-    inputB.addEventListener('input', function() {
-        formatarMoeda(this);
-        processarCalculos();
+    btnLimpar.addEventListener('click', function() {
+        if(confirm("Tem certeza que deseja apagar todo o histórico?")) {
+            localStorage.removeItem('historicoBancas');
+            atualizarTabelaInterface();
+        }
     });
 </script>
 
