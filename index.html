@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Calculadora de Banca com Histórico</title>
+    <title>Calculadora de Banca com Histórico e Data</title>
     <style>
         * {
             box-sizing: border-box;
@@ -27,7 +27,7 @@
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
             padding: 30px;
             width: 100%;
-            max-width: 500px;
+            max-width: 520px;
             margin-bottom: 25px;
         }
 
@@ -166,7 +166,7 @@
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
             padding: 20px;
             width: 100%;
-            max-width: 500px;
+            max-width: 520px;
             overflow-x: auto;
         }
 
@@ -174,17 +174,23 @@
             width: 100%;
             border-collapse: collapse;
             text-align: left;
-            font-size: 0.9rem;
+            font-size: 0.85rem;
         }
 
         th, td {
-            padding: 10px;
+            padding: 10px 8px;
             border-bottom: 1px solid #eee;
         }
 
         th {
             background-color: #f8f9fa;
             color: #666;
+        }
+
+        .txt-data {
+            color: #777;
+            font-size: 0.8rem;
+            white-space: nowrap;
         }
 
         .subiu { color: #28a745; font-weight: bold; }
@@ -239,7 +245,7 @@
     <table id="tabelaHistorico">
         <thead>
             <tr>
-                <th>#</th>
+                <th>Data / Hora</th>
                 <th>Soma Total</th>
                 <th>Evolução</th>
             </tr>
@@ -266,7 +272,7 @@
 
     let ultimaSomaCalculada = 0;
 
-    // Inicia carregando o histórico salvo no navegador
+    // Carrega o histórico ao iniciar a página
     atualizarTabelaInterface();
 
     function formatarMoeda(input) {
@@ -311,26 +317,44 @@
         }
     }
 
-    // --- LÓGICA DO LOCAL STORAGE E HISTÓRICO ---
+    // --- LÓGICA DO LOCAL STORAGE, DATA E HISTÓRICO ---
 
     function pegarHistorico() {
-        return JSON.parse(localStorage.getItem('historicoBancas')) || [];
+        return JSON.parse(localStorage.getItem('historicoBancasCompleto')) || [];
+    }
+
+    function obterDataHoraAtual() {
+        const agora = new Date();
+        const dia = String(agora.getDate()).padStart(2, '0');
+        const mes = String(agora.getMonth() + 1).padStart(2, '0'); // Meses começam em 0
+        const ano = agora.getFullYear();
+        const hora = String(agora.getHours()).padStart(2, '0');
+        const minuto = String(agora.getMinutes()).padStart(2, '0');
+
+        return `${dia}/${mes}/${ano} - ${hora}:${minuto}`;
     }
 
     function salvarNoHistorico(novaSoma) {
-        if (novaSoma <= 0) return; // Evita salvar valor zerado
+        if (novaSoma <= 0) return; 
 
         let historico = pegarHistorico();
+        let dataFormatada = obterDataHoraAtual();
 
-        // Insere o novo registro no início da lista
-        historico.unshift(novaSoma);
+        // Cria o objeto contendo o valor e o momento exato do registro
+        let novoRegistro = {
+            valor: novaSoma,
+            data: dataFormatada
+        };
 
-        // Limita o array para manter apenas as últimas 20 entradas
+        // Adiciona no topo da lista
+        historico.unshift(novoRegistro);
+
+        // Garante o limite das últimas 20 linhas
         if (historico.length > 20) {
-            historico = histor River = historico.slice(0, 20);
+            historico = historico.slice(0, 20);
         }
 
-        localStorage.setItem('historicoBancas', JSON.stringify(historico));
+        localStorage.setItem('historicoBancasCompleto', JSON.stringify(historico));
         atualizarTabelaInterface();
     }
 
@@ -343,17 +367,15 @@
             return;
         }
 
-        // Renderiza da linha mais nova para a mais antiga
-        historico.forEach((valorAtual, index) => {
+        historico.forEach((itemAtual, index) => {
             let textoEvolucao = "-";
             let classeEvolucao = "neutro";
 
-            // O item mais antigo no array (último da lista) não tem anterior para comparar.
-            // Como usamos unshift(), o elemento "anterior" cronologicamente está no índice (index + 1)
+            // Compara com o item cronologicamente anterior (índice seguinte devido ao unshift)
             if (index < historico.length - 1) {
-                let valorAnterior = historico[index + 1];
-                let diferenca = valorAtual - valorAnterior;
-                let pctDif = (diferenca / valorAnterior) * 100;
+                let itemAnterior = historico[index + 1];
+                let diferenca = itemAtual.valor - itemAnterior.valor;
+                let pctDif = (diferenca / itemAnterior.valor) * 100;
 
                 let difFormatada = diferenca.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -371,8 +393,8 @@
 
             let tr = document.createElement('tr');
             tr.innerHTML = `
-                <td><strong>${historico.length - index}</strong></td>
-                <td>${valorAtual.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                <td class="txt-data">${itemAtual.data}</td>
+                <td><strong>${itemAtual.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong></td>
                 <td class="${classeEvolucao}">${textoEvolucao}</td>
             `;
             corpoHistorico.appendChild(tr);
@@ -390,7 +412,7 @@
 
     btnLimpar.addEventListener('click', function() {
         if(confirm("Tem certeza que deseja apagar todo o histórico?")) {
-            localStorage.removeItem('historicoBancas');
+            localStorage.removeItem('historicoBancasCompleto');
             atualizarTabelaInterface();
         }
     });
